@@ -5,7 +5,7 @@ import os
 
 # গিটহাব থেকে সিক্রেট হিসেবে টোকেনটি নেওয়া হবে
 GITHUB_TOKEN = os.getenv("GH_TOKEN")
-REPO_NAME = "nrjtvbd/redforce" 
+REPO_NAME = "nrjtvbd/plusbox" 
 FILE_PATH = "plusbox.m3u8"
 
 def get_plusbox_token():
