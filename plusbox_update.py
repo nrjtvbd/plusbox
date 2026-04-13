@@ -9,34 +9,40 @@ REPO_NAME = "nrjtvbd/plusbox"
 FILE_PATH = "plusbox.m3u8"
 
 def get_plusbox_token():
+    # বিটিভি ওয়ার্ল্ড এর এমবেড লিঙ্ক
     url = "https://backend.plusbox.tv/BTVWorld/embed.html"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://plusbox.tv/'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://plusbox.tv/',
+        'Origin': 'https://plusbox.tv',
+        'Accept-Language': 'en-US,en;q=0.9'
     }
     try:
-        response = requests.get(url, headers=headers, timeout=15)
-        # টোকেন খোঁজার লজিক
-        match = re.search(r'token=([a-zA-Z0-9\-_.]+)', response.text)
-        return match.group(1) if match else None
-    except:
+        response = requests.get(url, headers=headers, timeout=20)
+        # যদি রেসপন্স কোড ২০০ হয় তবেই টোকেন খুঁজবো
+        if response.status_code == 200:
+            match = re.search(r'token=([a-zA-Z0-9\-_.]+)', response.text)
+            if match:
+                return match.group(1)
+        print(f"Server Response Code: {response.status_code}")
+        return None
+    except Exception as e:
+        print(f"Error: {e}")
         return None
 
 def generate_playlist(token):
-    # আপনার দেওয়া সোর্স ফাইল থেকে প্রধান চ্যানেলগুলোর লিস্ট [cite: 10, 11, 20, 38, 42]
     channels = [
         {"name": "T-SPORTS HD", "id": "TSportsHD"},
         {"name": "BTV WORLD", "id": "BTVWorld"},
+        {"name": "GAZI TV HD", "id": "GaziTVHD"},
         {"name": "STAR JALSHA HD", "id": "StarJalshaHD"},
         {"name": "SONY TEN 1 HD", "id": "SonyTen1HD"},
-        {"name": "GAZI TV HD", "id": "GaziTVHD"},
         {"name": "STAR SPORTS 1 HD", "id": "StarSports1HD"},
         {"name": "ZEE BANGLA HD", "id": "ZeeBanglaHD"}
     ]
     
     m3u = "#EXTM3U\n"
     for ch in channels:
-        # index.fmp4.m3u8 ব্যবহার করলে অডিও এবং ভিডিও একটি লিঙ্কেই কাজ করবে 
         stream_url = f"https://backend.plusbox.tv/{ch['id']}/index.fmp4.m3u8?token={token}"
         m3u += f"#EXTINF:-1, {ch['name']}\n{stream_url}\n"
     return m3u
@@ -54,10 +60,11 @@ def update_github(content):
     requests.put(api_url, headers=headers, json=data)
 
 if __name__ == "__main__":
+    print("🚀 Fetching token...")
     token = get_plusbox_token()
     if token:
         playlist = generate_playlist(token)
         update_github(playlist)
-        print("✅ Success!")
+        print(f"✅ Success! Token: {token[:10]}...")
     else:
-        print("❌ Token Error")
+        print("❌ Token Error: Could not fetch from Plusbox.")
