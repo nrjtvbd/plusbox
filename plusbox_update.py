@@ -8,7 +8,7 @@ GITHUB_TOKEN = os.getenv("GH_TOKEN")
 REPO_NAME = "nrjtvbd/plusbox"
 FILE_PATH = "playlist.m3u8"
 # আপনার নতুন Google Script URL এখানে দিন
-GAS_URL = "https://script.google.com/macros/s/AKfycbzJNkle4tERGuVhz9jOUj0s53mxBN-1-0K-3RGNos5QIptkPmgi-DXzVG5QrIaYr9dV/exec"
+GAS_URL = "https://script.google.com/macros/s/AKfycbwIG3ioOqUZJp7fXVTDd1GkOQrSCapVu9eE0B1S-PlCqf1UQJWO3cakWTm5xSIjjqfo/exec"
 
 def get_token():
     print("📡 Contacting Google Tunnel for Token...")
