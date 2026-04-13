@@ -1,0 +1,25 @@
+name: Plusbox Auto Update
+on:
+  schedule:
+    - cron: '*/30 * * * *' # প্রতি ৩০ মিনিট পর পর চলবে
+  workflow_dispatch: # ম্যানুয়ালি চালানোর অপশন
+
+jobs:
+  update-playlist:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install Dependencies
+        run: pip install requests
+
+      - name: Run Update Script
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: python plusbox_update.py
