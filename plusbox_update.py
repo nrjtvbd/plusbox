@@ -6,7 +6,7 @@ GITHUB_TOKEN = os.getenv("GH_TOKEN")
 REPO_NAME = "nrjtvbd/plusbox" 
 FILE_PATH = "playlist.m3u8"
 # গুগল স্ক্রিপ্টের লিঙ্কটি এখানে দিন
-GAS_URL = "https://script.google.com/macros/s/AKfycbx2wC8j51NWarcGaFaVIFvJOFgnYgFnuXVsDZqOCIjPXPscG0kmPS1Y3pls7-Hz6WM2/exec" 
+GAS_URL = "https://script.google.com/macros/s/AKfycbxqEzYDuis3g9RLJ9Ha9qocHWBZUqJiC9_yTJcQOjD-Ri-9Yaqx1iKfw7F8O7gHAxjR/exec" 
 
 def get_token_from_google():
     try:
