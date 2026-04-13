@@ -2,95 +2,86 @@ import requests
 import re
 import base64
 import os
+import time
 
-# --- GitHub Configuration ---
-# Apnar GitHub Secret-e 'GH_TOKEN' name token-ti thakte hobe
+# --- কনফিগারেশন ---
 GITHUB_TOKEN = os.getenv("GH_TOKEN") 
-REPO_NAME = "nrjtvbd/plusbox"  # Apnar repo name
-FILE_PATH = "playlist.m3u8"    # Jei name playlist save hobe
+REPO_NAME = "nrjtvbd/plusbox" 
+FILE_PATH = "playlist.m3u8"
 
 def get_plusbox_token():
-    """Plusbox theke dynamic token sangraha korar method"""
     url = "https://backend.plusbox.tv/BTVWorld/embed.html"
+    # সেশন ব্যবহার করলে কুকি ম্যানেজমেন্ট সহজ হয়
+    session = requests.Session()
+    
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Referer': 'https://plusbox.tv/',
-        'Origin': 'https://plusbox.tv'
+        'Origin': 'https://plusbox.tv',
+        'Sec-Fetch-Dest': 'iframe',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin'
     }
-    try:
-        response = requests.get(url, headers=headers, timeout=15)
-        if response.status_code == 200:
-            # Regex diye token khuje ber kora
-            match = re.search(r'token=([a-zA-Z0-9\-_.]+)', response.text)
-            if match:
-                return match.group(1)
-        return None
-    except Exception as e:
-        print(f"Token Error: {e}")
-        return None
 
-def create_m3u8_playlist(token):
-    """Token bebohar kore puronago M3U8 content toiri korar method"""
-    # Apnar deya list onujayi channel gulo
+    for i in range(3): # ৩ বার চেষ্টা করবে
+        try:
+            response = session.get(url, headers=headers, timeout=20)
+            if response.status_code == 200:
+                match = re.search(r'token=([a-zA-Z0-9\-_.]+)', response.text)
+                if match:
+                    return match.group(1)
+            print(f"Attempt {i+1}: Status {response.status_code}")
+            time.sleep(2) # ২ সেকেন্ড বিরতি
+        except Exception as e:
+            print(f"Attempt {i+1} Error: {e}")
+    return None
+
+def create_playlist(token):
+    # আপনার আপলোড করা ফাইল থেকে চ্যানেলের নাম ও আইডি 
     channels = [
-        {"name": "T-SPORTS HD", "id": "TSportsHD"},
-        {"name": "T-SPORTS", "id": "TSports"},
-        {"name": "Gazi TV HD", "id": "GaziTVHD"},
         {"name": "BTV WORLD", "id": "BTVWorld"},
+        {"name": "T SPORTS HD", "id": "TSportsHD"},
+        {"name": "GAZI TV HD", "id": "GaziTVHD"},
         {"name": "STAR JALSHA HD", "id": "StarJalshaHD"},
         {"name": "SONY TEN 1 HD", "id": "SonyTen1HD"},
-        {"name": "SONY TEN 2 HD", "id": "SonyTen2HD"},
-        {"name": "SONY MAX HD", "id": "SonyMaxHD"},
-        {"name": "ZEE BANGLA HD", "id": "ZeeBanglaHD"},
-        {"name": "COLORS BANGLA", "id": "ColorsBangla"}
+        {"name": "STAR SPORTS 1 HD", "id": "StarSports1HD"},
+        {"name": "ZEE BANGLA HD", "id": "ZeeBanglaHD"}
     ]
     
-    m3u_content = "#EXTM3U\n"
+    m3u = "#EXTM3U\n"
     for ch in channels:
-        # Link structure: https://backend.plusbox.tv/{ID}/index.fmp4.m3u8?token={TOKEN}
+        # fmp4 স্ট্রিম ব্যবহার করা হয়েছে যাতে অডিও-ভিডিও একসাথে চলে 
         stream_url = f"https://backend.plusbox.tv/{ch['id']}/index.fmp4.m3u8?token={token}"
-        m3u_content += f"#EXTINF:-1, {ch['name']}\n{stream_url}\n"
+        m3u += f"#EXTINF:-1, {ch['name']}\n{stream_url}\n"
+    return m3u
+
+def update_github(content):
+    api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
-    return m3u_content
-
-def update_github_file(content):
-    """GitHub API bebohar kore file update korar method"""
-    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-
-    # 1. Purono file-er SHA neya (update korar jonno dorkar)
-    get_res = requests.get(url, headers=headers)
-    sha = get_res.json().get('sha') if get_res.status_code == 200 else None
-
-    # 2. Content-ke Base64 encode kora
-    base64_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
-
+    res = requests.get(api_url, headers=headers)
+    sha = res.json().get('sha') if res.status_code == 200 else None
+    
+    content_encoded = base64.b64encode(content.encode()).decode()
     data = {
         "message": "Auto Update Plusbox Playlist",
-        "content": base64_content,
+        "content": content_encoded,
         "sha": sha
     }
-
-    # 3. File upload/update kora
-    put_res = requests.put(url, headers=headers, json=data)
+    
+    put_res = requests.put(api_url, headers=headers, json=data)
     if put_res.status_code in [200, 201]:
-        print("✅ Playlist Successfully Updated on GitHub!")
+        print("✅ Playlist Updated on GitHub!")
     else:
-        print(f"❌ Failed to update GitHub: {put_res.text}")
+        print(f"❌ GitHub Update Failed: {put_res.text}")
 
 if __name__ == "__main__":
-    print("Step 1: Fetching Token...")
+    print("🚀 Fetching Token...")
     token = get_plusbox_token()
-    
     if token:
-        print(f"✅ Token Found: {token[:15]}...")
-        print("Step 2: Creating M3U8 Playlist...")
-        playlist = create_m3u8_playlist(token)
-        
-        print("Step 3: Uploading to GitHub...")
-        update_github_file(playlist)
+        print(f"✅ Token: {token[:10]}...")
+        playlist_content = create_playlist(token)
+        update_github(playlist_content)
     else:
-        print("❌ Token not found! Server might be blocking the request.")
+        print("❌ Server is still blocking. Try changing the GH_TOKEN or Repo settings.")
