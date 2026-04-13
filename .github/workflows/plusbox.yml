@@ -26,7 +26,7 @@ jobs:
           sudo apt-get install -y google-chrome-stable
 
       - name: Install Python dependencies
-        run: pip install selenium webdriver-manager
+        run: pip install selenium
 
       - name: Run playlist fetcher
         run: python fetch_playlist.py
