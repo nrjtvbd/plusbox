@@ -2,112 +2,79 @@ import requests
 import re
 import base64
 import os
-import json
+import time
 
 # --- CONFIGURATION ---
 GITHUB_TOKEN = os.getenv("GH_TOKEN")
-REPO_NAME = "nrjtvbd/plusbox"  # আপনার রেপো নাম
-M3U_FILENAME = "playlist.m3u8"
-SOURCE_FILE = "plusboxtv.txt"  # এই ফাইল থেকে চ্যানেল ডাটা রিড করবে
+REPO_NAME = "nrjtvbd/plusbox" 
+FILE_PATH = "playlist.m3u8"
 
-def get_token():
-    """Plusbox থেকে লেটেস্ট টোকেন বের করার মেথড"""
+def get_plusbox_token():
+    # সরাসরি এমবেড ইউআরএল এর বদলে প্লাসবক্সের ডাটা গেটওয়ে ট্রাই করা হচ্ছে
     url = "https://backend.plusbox.tv/BTVWorld/embed.html"
+    session = requests.Session()
+    
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': '*/*',
         'Referer': 'https://plusbox.tv/',
-        'Origin': 'https://plusbox.tv'
+        'Origin': 'https://plusbox.tv',
+        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"'
     }
+
     try:
-        # সরাসরি requests দিয়ে ট্রাই করা হচ্ছে (403 এড়াতে উন্নত হেডারসহ)
-        response = requests.get(url, headers=headers, timeout=20)
+        # কুকি জেনারেট করার জন্য প্রথমে মেইন সাইটে একবার হিট করা
+        session.get("https://plusbox.tv/", headers={'User-Agent': headers['User-Agent']}, timeout=10)
+        
+        # এবার টোকেনের জন্য রিকোয়েস্ট
+        response = session.get(url, headers=headers, timeout=20)
+        
         if response.status_code == 200:
             match = re.search(r'token=([a-zA-Z0-9\-_.]+)', response.text)
             if match:
                 return match.group(1)
+        
+        print(f"Server Response: {response.status_code}")
         return None
-    except:
+    except Exception as e:
+        print(f"Request Error: {e}")
         return None
 
-def extract_channels_from_file(filename):
-    """আপনার আপলোড করা plusboxtv.txt থেকে চ্যানেল আইডি ও নাম সংগ্রহ করবে"""
-    channels = []
-    if not os.path.exists(filename):
-        # যদি ফাইল না থাকে, তবে ডিফল্ট কিছু চ্যানেল ব্যবহার করবে
-        return [
-            {"id": "TSportsHD", "title": "T-Sports HD"},
-            {"id": "BTVWorld", "title": "BTV World"},
-            {"name": "GaziTVHD", "id": "Gazi TV HD"}
-        ]
+def update_github(token):
+    # চ্যানেল লিস্ট তৈরি (আপনি চাইলে plusboxtv.txt থেকেও নিতে পারেন)
+    channels = [
+        {"name": "T-SPORTS HD", "id": "TSportsHD"},
+        {"name": "BTV WORLD", "id": "BTVWorld"},
+        {"name": "GAZI TV HD", "id": "GaziTVHD"},
+        {"name": "STAR JALSHA HD", "id": "StarJalshaHD"},
+        {"name": "SONY TEN 1 HD", "id": "SonyTen1HD"}
+    ]
 
-    with open(filename, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    # আপনার টেক্সট ফাইলের ফরম্যাট অনুযায়ী আইডি খুঁজে বের করার লজিক
-    # যেমন: /TSportsHD/embed.html থেকে 'TSportsHD' আইডি নিবে
-    pattern = r'/([a-zA-Z0-9]+)/embed\.html'
-    matches = re.findall(pattern, content)
-    
-    # ডুপ্লিকেট রিমুভ করে লিস্ট তৈরি
-    unique_ids = list(set(matches))
-    for ch_id in unique_ids:
-        channels.append({
-            "id": ch_id,
-            "title": ch_id.replace("HD", " HD").upper() # আইডি থেকে সুন্দর নাম তৈরি
-        })
-    return channels
-
-def update_github(content):
-    """GitHub API ব্যবহার করে ফাইল পুশ করার মেথড"""
-    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{M3U_FILENAME}"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-
-    # ফাইল থাকলে SHA নিবে, না থাকলে নতুন তৈরি করবে
-    get_res = requests.get(url, headers=headers)
-    sha = get_res.json().get('sha') if get_res.status_code == 200 else None
-
-    base64_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
-
-    data = {
-        "message": "System Update: Plusbox Playlist Refresh",
-        "content": base64_content,
-        "sha": sha
-    }
-
-    put_res = requests.put(url, headers=headers, json=data)
-    return put_res.status_code
-
-def main():
-    print("🚀 Process Started...")
-    
-    # ১. টোকেন সংগ্রহ
-    token = get_token()
-    if not token:
-        print("❌ Token Fetching Failed! (403 or Timeout)")
-        return
-
-    print(f"✅ Token Found: {token[:15]}...")
-
-    # ২. চ্যানেল এক্সট্রাকশন (ফাইল থেকে)
-    channels = extract_channels_from_file(SOURCE_FILE)
-    
-    # ৩. M3U8 প্লেলিস্ট তৈরি
     m3u_content = "#EXTM3U\n"
     for ch in channels:
-        # অডিও-ভিডিও একসাথে পাওয়ার জন্য index.fmp4.m3u8 ব্যবহার
         stream_url = f"https://backend.plusbox.tv/{ch['id']}/index.fmp4.m3u8?token={token}"
-        m3u_content += f"#EXTINF:-1, {ch['title']}\n{stream_url}\n"
+        m3u_content += f"#EXTINF:-1, {ch['name']}\n{stream_url}\n"
 
-    # ৪. গিটহাবে আপলোড
-    status = update_github(m3u_content)
+    # GitHub Update Logic
+    api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
-    if status in [200, 201]:
-        print(f"✅ Status: Online. {M3U_FILENAME} updated successfully!")
-    else:
-        print(f"❌ GitHub Update Failed with status: {status}")
+    get_res = requests.get(api_url, headers=headers)
+    sha = get_res.json().get('sha') if get_res.status_code == 200 else None
+    
+    encoded_content = base64.b64encode(m3u_content.encode()).decode()
+    data = {"message": "Update Playlist", "content": encoded_content, "sha": sha}
+    
+    requests.put(api_url, headers=headers, json=data)
 
 if __name__ == "__main__":
-    main()
+    print("🚀 Fetching dynamic token...")
+    token = get_plusbox_token()
+    if token:
+        print(f"✅ Token Found: {token[:10]}...")
+        update_github(token)
+        print("✅ GitHub File Updated!")
+    else:
+        print("❌ Token Error. Plusbox is still blocking GitHub Actions IP.")
