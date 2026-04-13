@@ -1,26 +1,30 @@
 import requests
 import base64
 import os
+import time
 
+# --- CONFIG ---
 GITHUB_TOKEN = os.getenv("GH_TOKEN")
-REPO_NAME = "nrjtvbd/plusbox" 
+REPO_NAME = "nrjtvbd/plusbox"
 FILE_PATH = "playlist.m3u8"
-# গুগল স্ক্রিপ্টের লিঙ্কটি এখানে দিন
-GAS_URL = "https://script.google.com/macros/s/AKfycbxqEzYDuis3g9RLJ9Ha9qocHWBZUqJiC9_yTJcQOjD-Ri-9Yaqx1iKfw7F8O7gHAxjR/exec" 
+# আপনার নতুন Google Script URL এখানে দিন
+GAS_URL = "https://script.google.com/macros/s/AKfycbzJNkle4tERGuVhz9jOUj0s53mxBN-1-0K-3RGNos5QIptkPmgi-DXzVG5QrIaYr9dV/exec"
 
-def get_token_from_google():
+def get_token():
+    print("📡 Contacting Google Tunnel for Token...")
     try:
-        print(f"📡 Requesting token via Google Tunnel...")
-        # Google Script রিডাইরেক্ট করে, তাই allow_redirects=True রাখতে হবে
-        response = requests.get(GAS_URL, allow_redirects=True, timeout=30)
-        if response.status_code == 200 and "Token_Not_Found" not in response.text:
-            return response.text.strip()
-        print(f"⚠️ Google couldn't find token. Status: {response.status_code}")
+        # Google Apps Script রিডাইরেক্ট করে, তাই allow_redirects জরুরি
+        res = requests.get(GAS_URL, allow_redirects=True, timeout=30)
+        token = res.text.strip()
+        if token and len(token) > 20 and "Token_Not_Found" not in token:
+            return token
+        print(f"⚠️ Response from Google: {token[:50]}")
     except Exception as e:
-        print(f"❌ Google Tunnel Error: {e}")
+        print(f"❌ Connection Error: {e}")
     return None
 
 def update_github(token):
+    # চ্যানেল লিস্ট
     channels = [
         {"name": "T-SPORTS HD", "id": "TSportsHD"},
         {"name": "BTV WORLD", "id": "BTVWorld"},
@@ -31,28 +35,29 @@ def update_github(token):
 
     m3u = "#EXTM3U\n"
     for ch in channels:
-        url = f"https://backend.plusbox.tv/{ch['id']}/index.fmp4.m3u8?token={token}"
-        m3u += f"#EXTINF:-1, {ch['name']}\n{url}\n"
+        # Master Stream URL
+        m3u += f"#EXTINF:-1, {ch['name']}\nhttps://backend.plusbox.tv/{ch['id']}/index.fmp4.m3u8?token={token}\n"
 
+    # GitHub Update
     api_url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
-    git_headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
-    res = requests.get(api_url, headers=git_headers)
-    sha = res.json().get('sha') if res.status_code == 200 else None
+    get_res = requests.get(api_url, headers=headers)
+    sha = get_res.json().get('sha') if get_res.status_code == 200 else None
     
     encoded = base64.b64encode(m3u.encode()).decode()
-    payload = {
-        "message": "Update: Fetched via Google Apps Script Tunnel",
-        "content": encoded,
-        "sha": sha
-    }
-    requests.put(api_url, headers=git_headers, json=payload)
+    data = {"message": "⚡ Auto-refresh via Google Tunnel", "content": encoded, "sha": sha}
+    
+    final_res = requests.put(api_url, headers=headers, json=data)
+    if final_res.status_code in [200, 201]:
+        print("✅ Playlist Successfully Updated on GitHub!")
+    else:
+        print(f"❌ GitHub Update Failed: {final_res.text}")
 
 if __name__ == "__main__":
-    token = get_token_from_google()
-    if token:
-        print(f"✅ Token Received: {token[:15]}...")
-        update_github(token)
-        print("✅ GitHub Updated via Google Tunnel!")
+    new_token = get_token()
+    if new_token:
+        print(f"🔑 New Token: {new_token[:15]}...")
+        update_github(new_token)
     else:
-        print("❌ Everything failed. Plusbox is blocking Google too.")
+        print("🛑 All tunnels failed. Plusbox is using JS-based token generation.")
