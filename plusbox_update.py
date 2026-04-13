@@ -5,18 +5,19 @@ import os
 GITHUB_TOKEN = os.getenv("GH_TOKEN")
 REPO_NAME = "nrjtvbd/plusbox" 
 FILE_PATH = "playlist.m3u8"
-# আপনার ওয়ার্কার লিঙ্কটি এখানে দিন (নিচেরটি উদাহরণ)
-WORKER_URL = "https://plusbox.drrkrana.workers.dev" 
+# গুগল স্ক্রিপ্টের লিঙ্কটি এখানে দিন
+GAS_URL = "https://script.google.com/macros/s/AKfycbx2wC8j51NWarcGaFaVIFvJOFgnYgFnuXVsDZqOCIjPXPscG0kmPS1Y3pls7-Hz6WM2/exec" 
 
-def get_token_from_worker():
+def get_token_from_google():
     try:
-        print(f"📡 Requesting token from Cloudflare Worker...")
-        response = requests.get(WORKER_URL, timeout=20)
+        print(f"📡 Requesting token via Google Tunnel...")
+        # Google Script রিডাইরেক্ট করে, তাই allow_redirects=True রাখতে হবে
+        response = requests.get(GAS_URL, allow_redirects=True, timeout=30)
         if response.status_code == 200 and "Token_Not_Found" not in response.text:
             return response.text.strip()
-        print(f"⚠️ Worker couldn't find token. Status: {response.status_code}")
+        print(f"⚠️ Google couldn't find token. Status: {response.status_code}")
     except Exception as e:
-        print(f"❌ Worker Error: {e}")
+        print(f"❌ Google Tunnel Error: {e}")
     return None
 
 def update_github(token):
@@ -41,17 +42,17 @@ def update_github(token):
     
     encoded = base64.b64encode(m3u.encode()).decode()
     payload = {
-        "message": "Update: Fetched via Worker Tunnel",
+        "message": "Update: Fetched via Google Apps Script Tunnel",
         "content": encoded,
         "sha": sha
     }
     requests.put(api_url, headers=git_headers, json=payload)
 
 if __name__ == "__main__":
-    token = get_token_from_worker()
+    token = get_token_from_google()
     if token:
         print(f"✅ Token Received: {token[:15]}...")
         update_github(token)
-        print("✅ GitHub Updated!")
+        print("✅ GitHub Updated via Google Tunnel!")
     else:
-        print("❌ Still failing. Plusbox is blocking Cloudflare too.")
+        print("❌ Everything failed. Plusbox is blocking Google too.")
