@@ -1,5 +1,4 @@
 import requests
-import cloudscraper
 import re
 import datetime
 import time
@@ -11,66 +10,55 @@ CHANNELS = [
     {"id": "SonyTen1", "name": "SONY TEN 1 HD"}
 ]
 
+# এখানে ব্যাকআপ ডোমেইনগুলো লিস্ট করা হয়েছে
+BACKUP_DOMAINS = [
+    "https://backend.plusbox.tv",
+    "https://plusbox.tv",
+    "http://tv.rangdhanu.live"
+]
+
 def get_token(ch_id):
-    # সেশন এবং স্ক্র্যাপার সেটআপ
-    scraper = cloudscraper.create_scraper(
-        browser={
-            'browser': 'chrome',
-            'platform': 'windows',
-            'desktop': True
-        }
-    )
-    
-    # আপনার পাঠানো লগ অনুযায়ী হেডার সেট করা হয়েছে
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-        "Referer": f"https://backend.plusbox.tv/{ch_id}/embed.html",
-        "Origin": "https://backend.plusbox.tv",
-        "Accept": "*/*",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Dest": "empty"
+        "Referer": "https://plusbox.tv/",
+        "Accept": "*/*"
     }
-
-    try:
-        # সরাসরি ব্যাকএন্ড থেকে টোকেন নেয়ার চেষ্টা
-        url = f"https://backend.plusbox.tv/{ch_id}/embed.html"
-        response = scraper.get(url, headers=headers, timeout=20)
-        
-        # আপনার লগের টোকেন ফরম্যাট অনুযায়ী রিজেক্স (Regex)
-        token_match = re.search(r'token=([a-zA-Z0-9\-_.]+)', response.text)
-        
-        if not token_match:
-            # যদি এম্বেড পেজে না পাওয়া যায়, তবে মেইন সাইটে ট্রাই করবে
-            main_url = f"https://plusbox.tv/play.php?id={ch_id}"
-            response = scraper.get(main_url, headers=headers, timeout=20)
-            token_match = re.search(r'token=([a-zA-Z0-9\-_.]+)', response.text)
-
-        if token_match:
-            return token_match.group(1)
+    
+    for base_url in BACKUP_DOMAINS:
+        try:
+            # ব্যাকআপ সার্ভার থেকে টোকেন খোঁজা
+            url = f"{base_url}/{ch_id}/embed.html"
+            if "play.php" not in url:
+                # সরাসরি এম্বেড পেজ ট্রাই করা
+                response = requests.get(url, headers=headers, timeout=10)
+                token_match = re.search(r'token=([a-zA-Z0-9\-_.]+)', response.text)
+                
+                if token_match:
+                    print(f"✅ Token found using backup: {base_url}")
+                    return token_match.group(1)
+        except:
+            continue
             
-    except Exception as e:
-        print(f"Error fetching {ch_id}: {e}")
     return None
 
 def main():
     entries = []
-    print("🚀 Starting Plusbox Dynamic Fetcher...")
+    print("🚀 Attempting Plusbox Fetch with Backup Servers...")
     
     for ch in CHANNELS:
         token = get_token(ch['id'])
         if token:
-            # নতুন ইউআরএল ফরম্যাট: backend.plusbox.tv ব্যবহার করা হয়েছে
+            # ব্যাকআপ সার্ভারের লিঙ্ক ফরম্যাট
             stream_url = f"https://backend.plusbox.tv/{ch['id']}/index.fmp4.m3u8?token={token}"
-            entries.append(f'#EXTINF:-1 tvg-name="{ch["name"]}" tvg-logo="http://tv.rangdhanu.live/img/rangdhanulive.png",{ch["name"]}\n{stream_url}')
+            entries.append(f'#EXTINF:-1 tvg-name="{ch["name"]}",{ch["name"]}\n{stream_url}')
             print(f"✅ {ch['name']} Success")
         else:
             print(f"❌ {ch['name']} Failed")
-        time.sleep(3)
+        time.sleep(2)
 
     with open("playlist.m3u", "w") as f:
-        f.write("#EXTM3U\n# Updated: " + str(datetime.datetime.now()) + "\n" + "\n".join(entries))
-    print("🎉 Playlist Updated Successfully!")
+        f.write("#EXTM3U\n# Backup Update: " + str(datetime.datetime.now()) + "\n" + "\n".join(entries))
+    print("🎉 Sync Complete!")
 
 if __name__ == "__main__":
     main()
