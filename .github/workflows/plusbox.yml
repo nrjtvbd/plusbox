@@ -1,45 +1,35 @@
-name: Update Playlist
+name: Update Plusbox Playlist
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '*/30 * * * *' # প্রতি ৩০ মিনিট পর পর চলবে
+  workflow_dispatch: # ম্যানুয়ালি চালানোর জন্য
 
 jobs:
-  update-playlist:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      - name: Install Chrome
+      - name: Install Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          python -m pip install --upgrade pip
+          pip install requests cloudscraper
 
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run playlist fetcher
+      - name: Run Fetcher Script
         run: python fetch_playlist.py
 
-      - name: Commit and push playlist
+      - name: Commit and Push Changes
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # এই লাইনে পরিবর্তন করা হয়েছে যেন এরর না দেয়
-          git add playlist.m3u || echo "File not found"
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "chore: update playlist [$(date -u '+%Y-%m-%d %H:%M UTC')]"
-            git push
-          fi
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add playlist.m3u
+          git commit -m "Auto Update: $(date)" || echo "No changes to commit"
+          git push
