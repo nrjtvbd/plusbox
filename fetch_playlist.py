@@ -1,72 +1,53 @@
-import re
-import time
-import datetime
 import requests
+import cloudscraper
+import re
+import datetime
 
 # --- Configuration ---
-BASE_URL = "https://backend.plusbox.tv/"
 PLAYLIST_FILENAME = "playlist.m3u"
-
 CHANNELS = [
-    {"id": "TSportsHD", "name": "T-SPORTS HD", "group": "Sports"},
-    {"id": "BTVWorld", "name": "BTV WORLD", "group": "Entertainment"},
-    {"id": "GaziTVHD", "name": "GAZI TV HD", "group": "Entertainment"},
-    {"id": "StarJalshaHD", "name": "STAR JALSHA HD", "group": "Entertainment"},
-    {"id": "SonyTen1HD", "name": "SONY TEN 1 HD", "group": "Sports"}
+    {"id": "525", "name": "BTV WORLD"},
+    {"id": "531", "name": "GAZI TV HD"},
+    {"id": "540", "name": "STAR JALSHA HD"},
+    {"id": "580", "name": "SONY TEN 1 HD"}
 ]
 
-def get_token_via_proxy(ch_id):
-    # ফ্রি প্রক্সি লিস্ট (এগুলো কাজ না করলে বাংলাদেশের কোনো প্রক্সি ইউআরএল এখানে দেওয়া যায়)
-    proxies_list = [
-        None, # প্রথমে প্রক্সি ছাড়া চেষ্টা
-        "http://45.72.55.122:8080", 
-        "http://185.162.229.155:80"
-    ]
-    
-    url = f"{BASE_URL}{ch_id}/embed.html"
+def get_token(ch_id):
+    scraper = cloudscraper.create_scraper()
     headers = {
         "Referer": "https://plusbox.tv/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
     }
-
-    for proxy_url in proxies_list:
-        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
-        try:
-            print(f"Trying {'Proxy: ' + proxy_url if proxy_url else 'Direct Connection'}...")
-            response = requests.get(url, headers=headers, proxies=proxies, timeout=10)
-            if response.status_code == 200:
-                html = response.text
-                token_match = re.search(r'token=([a-zA-Z0-9\-_.]+)', html)
-                if token_match:
-                    return token_match.group(1)
-        except:
-            continue
+    try:
+        url = f"https://plusbox.tv/play.php?id={ch_id}"
+        response = scraper.get(url, headers=headers, timeout=15)
+        # টোকেন খোঁজার রিজেক্স
+        token_match = re.search(r'token=([a-zA-Z0-9\-_.]+)', response.text)
+        if token_match:
+            return token_match.group(1)
+    except Exception as e:
+        print(f"Error for ID {ch_id}: {e}")
     return None
 
 def main():
-    print(f"🚀 Starting Emergency Proxy Fetch...")
+    print("🚀 Starting Plusbox Direct Fetcher (Termux)...")
     playlist_entries = []
     
     for ch in CHANNELS:
         print(f"📡 Requesting: {ch['name']}...")
-        token = get_token_via_proxy(ch['id'])
-        
+        token = get_token(ch['id'])
         if token:
-            stream_url = f"https://backend.plusbox.tv/{ch['id']}/index.fmp4.m3u8?token={token}"
-            playlist_entries.append(f'#EXTINF:-1 tvg-name="{ch["name"]}" group-title="{ch["group"]}",{ch["name"]}\n{stream_url}')
-            print(f"✅ Success!")
+            stream_url = f"https://plusbox.tv/live/{ch['id']}/index.m3u8?token={token}"
+            playlist_entries.append(f'#EXTINF:-1 tvg-name="{ch["name"]}",{ch["name"]}\n{stream_url}')
+            print("✅ Success!")
         else:
-            print(f"❌ Failed to get token.")
-        time.sleep(2)
+            print("❌ Failed to get token.")
 
-    if playlist_entries:
-        updated_at = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        content = ["#EXTM3U", f"# Last Updated: {updated_at}"] + playlist_entries
-        with open(PLAYLIST_FILENAME, "w") as f:
-            f.write("\n".join(content))
-        print(f"🎉 Playlist updated with {len(playlist_entries)} channels!")
-    else:
-        print("🛑 All attempts failed. Plusbox is extremely secured against Cloud IPs.")
+    header = f"#EXTM3U\n# Last Updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+    with open(PLAYLIST_FILENAME, "w") as f:
+        f.write(header + "\n".join(playlist_entries))
+    
+    print(f"\n🎉 Process Complete! {len(playlist_entries)} channels saved.")
 
 if __name__ == "__main__":
     main()
