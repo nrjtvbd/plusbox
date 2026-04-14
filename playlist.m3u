@@ -1,2 +1,11 @@
 #EXTM3U
-# Backup Update: 2026-04-14 19:35:13.340785
+# Last Sync: 2026-04-14 19:37:43
+# Source: Backup Token
+#EXTINF:-1 tvg-name="BTV WORLD",BTV WORLD
+https://backend.plusbox.tv/BTVWorld/index.fmp4.m3u8?token=429c3921a2fd76dc77e7e39e440b8e7616c52327-06c5179800988e5db9acb5f98f7f8567-1776205375-1776194575
+#EXTINF:-1 tvg-name="GAZI TV HD",GAZI TV HD
+https://backend.plusbox.tv/GTV/index.fmp4.m3u8?token=429c3921a2fd76dc77e7e39e440b8e7616c52327-06c5179800988e5db9acb5f98f7f8567-1776205375-1776194575
+#EXTINF:-1 tvg-name="STAR JALSHA HD",STAR JALSHA HD
+https://backend.plusbox.tv/StarJalsha/index.fmp4.m3u8?token=429c3921a2fd76dc77e7e39e440b8e7616c52327-06c5179800988e5db9acb5f98f7f8567-1776205375-1776194575
+#EXTINF:-1 tvg-name="SONY TEN 1 HD",SONY TEN 1 HD
+https://backend.plusbox.tv/SonyTen1/index.fmp4.m3u8?token=429c3921a2fd76dc77e7e39e440b8e7616c52327-06c5179800988e5db9acb5f98f7f8567-1776205375-1776194575
